@@ -5,7 +5,7 @@ library(sp)
 
 
 #######################################################
-#Create a continuous grid of a certain cell size across the extent of the template raster
+#Create a continuous grid of a certain cell size 
 #######################################################
 create_grid=function(cellsize, minX, maxX, minY, maxY){
   lowerX=maxX-minX
@@ -30,6 +30,9 @@ assign_sites_to_grid=function(g, sites){
 ########################################################################
 south_american_grid=create_grid(cellsize = 5, minX=-84, maxX=-32, minY=-38, maxY=15)
 
+#Assign fire occurances to a grid cell, year, and month, and summarize the total fires 
+#within that cell. Made to work with read_csv_chunked() call since
+#the input csv is very large.
 process_fire_chunk=function(df, pos){
   df = df %>%
     mutate(date=as.Date(YYYYMMDD, format='%Y%m%d')) %>%
@@ -53,6 +56,7 @@ fire_data=read_csv_chunked('~/data/MCD14ML/cleaned_data.csv', callback = DataFra
                                             YYYYMMDD=col_character(), 
                                             HHMM=col_character()) )
 
+#Sum up counts again in case fires close by got processed in different chunks.
 fire_data = fire_data %>%
   group_by(year, month, cell_id, sat) %>%
   summarize(n_fires = sum(n_fires))
