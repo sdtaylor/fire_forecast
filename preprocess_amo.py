@@ -17,7 +17,8 @@ col_names.insert(0,'year')
 df.columns=col_names
 
 #One value per row
-df=pd.melt(df, id_vars='year', value_vars=col_names[1:])
+df=pd.melt(df, id_vars='year', value_vars=col_names[1:],
+               var_name='month', value_name='amo_value')
 
 #-99 to nan
 df.replace([-99.99], [None], inplace=True)
