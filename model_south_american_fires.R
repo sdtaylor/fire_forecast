@@ -59,6 +59,25 @@ fire_data=read_csv_chunked('~/data/MCD14ML/cleaned_data.csv', callback = DataFra
 #Sum up counts again in case fires close by got processed in different chunks.
 fire_data = fire_data %>%
   group_by(year, month, cell_id, sat) %>%
-  summarize(n_fires = sum(n_fires))
+  summarize(n_fires = sum(n_fires)) %>%
+  ungroup()
+
+#Assign seasons
+fire_data = fire_data %>%
+  mutate(season=ifelse(month==1, year-1, year)) %>%
+  filter(month %in% c(1, 5,6,7,8,9,10,11,12)) %>%
+  group_by(cell_id, sat, season) %>%
+  summarize(n_fires=sum(n_fires))
 
 #########################################################################
+#Atlantic Multidecadal Oscillation
+amo_file='./climate_data/amo.csv'
+amo_data=read_csv(amo_file) %>%
+  filter(year>2000)
+
+#El nino index (ONI). The raw csv was copied and pasted from http://www.cpc.ncep.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
+ono_data = read_csv('./climate_data/oni.csv') %>%
+  rename(year=Year) %>%
+  gather(month, ono_value, -year) %>%
+  filter(year>2000)
+
