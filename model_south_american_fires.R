@@ -51,16 +51,36 @@ process_fire_chunk=function(df, pos){
     ungroup()
 }
 
-fire_data=read_csv_chunked('~/data/MCD14ML/cleaned_data.csv', callback = DataFrameCallback$new(process_fire_chunk), chunk_size = 50000, 
-                           col_types = list(sat = col_character(), 
-                                            YYYYMMDD=col_character(), 
-                                            HHMM=col_character()) )
+processed_fire_data_file='./proccessed_fire_data.csv'
+
+if(file.exists(processed_fire_data_file)){
+  fire_data = read_csv(processed_fire_data_file)
+} else {
+  fire_data=read_csv_chunked('~/data/MCD14ML/cleaned_data.csv', callback = DataFrameCallback$new(process_fire_chunk), chunk_size = 50000, 
+                             col_types = list(sat = col_character(), 
+                                             YYYYMMDD=col_character(), 
+                                              HHMM=col_character()) )
+  write.csv(fire_data, processed_fire_data_file, row.names =FALSE)
+}
 
 #Sum up counts again in case fires close by got processed in different chunks.
 fire_data = fire_data %>%
   group_by(year, month, cell_id, sat) %>%
   summarize(n_fires = sum(n_fires)) %>%
   ungroup()
+
+########################################################################
+#Find peak fire  month for each grid cell
+find_peak_fire_month=function(df){
+  df$month[which.max(df$n_fires)]
+}
+
+peak_fire_month = fire_data %>%
+  group_by(cell_id, sat, month) %>%
+  summarise(n_fires = mean(n_fires)) %>%
+  ungroup() %>%
+  group_by(cell_id, sat) %>%
+  summarise(peak_fire_month = find_peak_fire_month(.))
 
 #Assign seasons
 fire_data = fire_data %>%
@@ -69,11 +89,18 @@ fire_data = fire_data %>%
   group_by(cell_id, sat, season) %>%
   summarize(n_fires=sum(n_fires))
 
+
+
 #########################################################################
 #Atlantic Multidecadal Oscillation
 amo_file='./climate_data/amo.csv'
 amo_data=read_csv(amo_file) %>%
-  filter(year>2000)
+  filter(year>2000) %>%
+  mutate(date = as_date(paste(year,month,1,sep='-')),
+         fire_season = ifelse(month)) %>%
+  dplyr::select(-month)
+  
+
 
 #El nino index (ONI). The raw csv was copied and pasted from http://www.cpc.ncep.noaa.gov/products/analysis_monitoring/ensostuff/ensoyears.shtml
 ono_data = read_csv('./climate_data/oni.csv') %>%
