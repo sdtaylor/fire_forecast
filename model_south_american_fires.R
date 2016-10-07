@@ -69,26 +69,53 @@ fire_data = fire_data %>%
   summarize(n_fires = sum(n_fires)) %>%
   ungroup()
 
+#Only using Terra for now
+fire_data = fire_data %>%
+  filter(sat=='T') %>%
+  select(-sat)
+
+fire_data = fire_data %>%
+  mutate(date=as_date(paste(year,month,'01',sep='-')))
 ########################################################################
-#Find peak fire  month for each grid cell
+#Information on the peak fire month
 find_peak_fire_month=function(df){
   df$month[which.max(df$n_fires)]
 }
 
+#Find peak fire  month for each grid cell
 peak_fire_month = fire_data %>%
-  group_by(cell_id, sat, month) %>%
+  group_by(cell_id, month) %>%
   summarise(n_fires = mean(n_fires)) %>%
   ungroup() %>%
-  group_by(cell_id, sat) %>%
-  summarise(peak_fire_month = find_peak_fire_month(.))
+  group_by(cell_id) %>%
+  do(peak_fire_month = find_peak_fire_month(.)) %>%
+  ungroup()
 
-#Assign seasons
-fire_data = fire_data %>%
-  mutate(season=ifelse(month==1, year-1, year)) %>%
-  filter(month %in% c(1, 5,6,7,8,9,10,11,12)) %>%
-  group_by(cell_id, sat, season) %>%
-  summarize(n_fires=sum(n_fires))
+#Make an entry for each cell and each year in dataset with start and end time
+#to count fires and calculate FSS
+peak_fire_month = merge(peak_fire_month, data.frame(year=unique(fire_data$year)))
 
+peak_fire_month = peak_fire_month %>%
+  mutate(peak_fire_month=as_date(paste(year,peak_fire_month,1,sep='-'))) %>%
+  mutate(season_start = peak_fire_month - months(4),
+         season_end   = peak_fire_month + months(5) - days(1))
+
+
+
+#######################################################################
+#calculate FSS
+get_fss=function(df){
+  #print(df)
+  this_instance_data=fire_data %>%
+    filter(cell_id==df$cell_id, date>=df$season_start, date<df$season_end)
+  df$fss=sum(this_instance_data$n_fires)
+  return(as.data.frame(df))
+}
+
+
+fss=peak_fire_month %>%
+  rowwise() %>%
+  do(get_fss(.))
 
 
 #########################################################################
