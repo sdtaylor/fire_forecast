@@ -126,7 +126,7 @@ fss=peak_fire_month %>%
 #Atlantic Multidecadal Oscillation
 amo_file='./climate_data/amo.csv'
 amo_data=read_csv(amo_file) %>%
-  filter(year>2000) %>%
+  filter(year>=2000) %>%
   mutate(date = as_date(paste(year,month,1,sep='-')),
          fire_season = ifelse(month)) %>%
   dplyr::select(-month)
@@ -137,5 +137,5 @@ amo_data=read_csv(amo_file) %>%
 ono_data = read_csv('./climate_data/oni.csv') %>%
   rename(year=Year) %>%
   gather(month, ono_value, -year) %>%
-  filter(year>2000)
+  filter(year>=2000)
 
