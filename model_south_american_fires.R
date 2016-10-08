@@ -93,12 +93,16 @@ peak_fire_month = fire_data %>%
 
 #Make an entry for each cell and each year in dataset with start and end time
 #to count fires and calculate FSS
-peak_fire_month = merge(peak_fire_month, data.frame(year=unique(fire_data$year)))
+#Exclude year 2000 because it only has 2 months of data.
+peak_fire_month = merge(peak_fire_month, data.frame(year=unique(fire_data$year))) 
 
+#Get season start and end for each cell/year to calculate fss for that season
+#exclude any entires with a season_start before the earliest date in the data
 peak_fire_month = peak_fire_month %>%
   mutate(peak_fire_month=as_date(paste(year,peak_fire_month,1,sep='-'))) %>%
   mutate(season_start = peak_fire_month - months(4),
-         season_end   = peak_fire_month + months(5) - days(1))
+         season_end   = peak_fire_month + months(5) - days(1)) %>%
+  filter(season_start >= as_date('2000-11-01'))
 
 
 
