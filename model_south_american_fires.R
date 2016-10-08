@@ -1,4 +1,5 @@
 library(tidyverse)
+library(magrittr)
 library(lubridate)
 library(rgeos)
 library(sp)
@@ -126,9 +127,8 @@ fss=peak_fire_month %>%
 #Atlantic Multidecadal Oscillation
 amo_file='./climate_data/amo.csv'
 amo_data=read_csv(amo_file) %>%
-  filter(year>=2000) %>%
-  mutate(date = as_date(paste(year,month,1,sep='-')),
-         fire_season = ifelse(month)) %>%
+  dplyr::filter(year>=2000) %>%
+  dplyr::mutate(date = as_date(paste(year,month,1,sep='-'))) %>%
   dplyr::select(-month)
   
 
@@ -138,4 +138,68 @@ ono_data = read_csv('./climate_data/oni.csv') %>%
   rename(year=Year) %>%
   gather(month, ono_value, -year) %>%
   filter(year>=2000)
+
+month_integer=data.frame(month=c("DJF", "JFM", "FMA", "MAM", "AMJ", "MJJ", "JJA", "JAS", "ASO", "SON", "OND", "NDJ"), 
+                         month_int=1:12)
+
+ono_data = ono_data %>%
+  left_join(month_integer, by='month') %>%
+  mutate(date = as_date(paste(year,month_int,1,sep='-'))) %>%
+  select(-month, -month_int)
+rm(month_integer)
+  
+############################################################################
+get_climate_index_data=function(peak_fire_month, min_lead_time=4, max_lead_time=10){
+  months_to_include=seq(peak_fire_month-months(max_lead_time), peak_fire_month-months(min_lead_time), by='month')
+  
+  amo=amo_data %>%
+    filter(date %in% months_to_include) %>%
+    arrange(date) %>%
+    dplyr::select(-year,-date, index_value=amo_value)
+  amo$lead_time=max_lead_time:min_lead_time
+  amo$index='amo'
+  
+  ono=ono_data %>%
+    filter(date %in% months_to_include) %>%
+    arrange(date) %>%
+    dplyr::select(-year,-date, index_value=ono_value)
+  ono$lead_time=max_lead_time:min_lead_time
+  ono$index='ono'
+  
+  both=bind_rows(amo, ono)
+  both$peak_fire_month=peak_fire_month
+  return(both)
+}
+
+#Find the lead times with the maximum correlation between FSS and AMO/ONO for each cell
+find_lead_time=function(df){
+  climate_data=df %>%
+    rowwise() %>%
+    do(get_climate_index_data(.$peak_fire_month)) %>%
+    ungroup() %>%
+    left_join(select(df, peak_fire_month, fss))
+  
+   correlations=climate_data %>%
+    group_by(index, lead_time) %>%
+    summarize(corr=cor(fss, index_value)) %>%
+    ungroup()
+
+#TODO: get this to work
+  lead_times=correlations %>%
+    group_by(index, lead_time) %>%
+    filter(abs(corr)==max(abs(corr))) %>%
+    ungroup() %>%
+    dplyr::select(-corr) %>%
+    mutate(index=paste0(index,'_lead_time')) %>%
+    spread(index, lead_time)
+  
+}
+
+
+
+
+
+
+
+
 
