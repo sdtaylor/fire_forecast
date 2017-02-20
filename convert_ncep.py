@@ -31,7 +31,12 @@ def create_geotiff(filename, data, no_data_value, x_size, y_size, datatype, geo_
 
 #Read in a netcdf file with xarray and get X*Y*month array of total precip
 def compile_monthly_data(filename):
-    xr_object=xr.open_dataset(filename)
+    try:
+        xr_object=xr.open_dataset(filename)
+    except:
+        xr_object=xr.open_dataset(filename, decode_cf=False)
+        xr_object.prate.attrs.pop('_FillValue')
+        xr_object = xr.conventions.decode_cf(xr_object)
 
     #Mean mm/s to total precip over 6 hours
     xr_object['prate'] = xr_object.prate*6*60*60
