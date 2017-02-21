@@ -8,7 +8,7 @@ library(raster)
 
 south_american_extent=extent(276, 328, -38, 15)
 
-reference_raster = raster('~/data/ncep_reanalysis/2000-1.tif')
+reference_raster = raster('~/data/ncep_reanalysis/precip-2001.tif')
 
 #A dataframe to join total_fires with cell_id's
 reference_dataframe = as.data.frame(reference_raster)
