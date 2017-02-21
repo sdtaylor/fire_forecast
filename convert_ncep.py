@@ -29,8 +29,8 @@ def create_geotiff(filename, data, no_data_value, x_size, y_size, datatype, geo_
     gdalnumeric.BandWriteArray(band_out, data)
     band_out.SetNoDataValue(no_data_value)
 
-#Read in a netcdf file with xarray and get X*Y*month array of total precip
-def compile_monthly_data(filename):
+#Open the file and do a little preprocessing
+def open_ncep_file(filename):
     try:
         xr_object=xr.open_dataset(filename)
     except:
@@ -44,25 +44,48 @@ def compile_monthly_data(filename):
     #Convert each 6 hour measurement to just the month
     xr_object['time'] = xr_object.time.values.astype('datetime64[M]')
 
-    monthly_precip = np.zeros((12, xr_object.dims['lat'], xr_object.dims['lon']))
+    return xr_object
 
-    for i, this_month in enumerate(np.unique(xr_object.time.values)):
+#Read in a netcdf file with xarray and get X*Y*month array of total precip
+def jan_apr_precip(filename):
+    xr_object = open_ncep_file(filename)
+
+    monthly_precip = np.zeros((4, xr_object.dims['lat'], xr_object.dims['lon']))
+    months = np.unique(xr_object.time.values)
+    months.sort()
+
+    for i, this_month in enumerate(months[0:4]):
         monthly_precip[i] = np.sum(xr_object.sel(time=this_month).prate.values, axis=0)
 
-    return monthly_precip
+    total_precip = np.sum(monthly_precip, axis=0)
+    return total_precip
+
+def dec_precip(filename):
+    xr_object = open_ncep_file(filename)
+
+    monthly_precip = np.zeros((4, xr_object.dims['lat'], xr_object.dims['lon']))
+    months = np.unique(xr_object.time.values)
+    months.sort()
+    december = months[-1]
+
+    dec_precip = np.sum(xr_object.sel(time=december).prate.values, axis=0)
+    return dec_precip
+
+def ncep_filename(year):
+    return data_dir+'prate.sfc.gauss.'+str(year)+'.nc'
 
 ############################
-data_dir='/home/shawn/data/ncep_reanalysis/'
+raw_data_dir='/home/shawn/data/ncep_reanalysis/netcdf/'
+processed_data_dir='/home/shawn/projects/fire_prediction/data/precip_rasters/'
 
-years = list(range(2000,2017))
+years = list(range(2001,2017))
 
 if __name__ == '__main__':
     for year in years:
-        netcdf_filename = data_dir+'netcdf/prate.sfc.gauss.'+str(year)+'.nc'
+        netcdf_filename = ncep_filename(year)
         raster_info = get_netCDF_info(netcdf_filename)
 
-        prate_data=compile_monthly_data(netcdf_filename)
+        total_precip=jan_apr_precip(ncep_filename(year)) + dec_precip(ncep_filename(year-1))
 
-        for month in list(range(1,13)):
-            tif_filename = data_dir+str(year)+'-'+str(month)+'.tif'
-            create_geotiff(tif_filename, prate_data[month-1], *raster_info)
+        tif_filename = processed_data_dir+'precip-'+str(year)+'.tif'
+        create_geotiff(tif_filename, total_precip, *raster_info)
