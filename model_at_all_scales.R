@@ -1,7 +1,6 @@
 library(tidyverse)
 library(magrittr)
 library(lubridate)
-library(sp)
 library(raster)
 
 
@@ -16,14 +15,14 @@ results_file='results_amazon_fire.csv'
 #Convert all the raster data into a data.frame at a particular spatial scale.
 #unit scale is the original NCEP Reanalysis scale (2.5 deg). 
 #Each row is a year,month,cell
-compile_fire_precip_data = function(spatial_scale='unit'){
+compile_fire_precip_data = function(spatial_scale){
   all_data=data.frame()
   for(this_year in 2001:2015){
     precip_raster_file = paste0('./data/precip_rasters/precip-',this_year,'.tif')
     precip_raster = raster(precip_raster_file)
     precip_raster = crop(precip_raster, south_american_extent)
     
-    if(spatial_scale != 'unit'){
+    if(spatial_scale > 1){
       precip_raster = aggregate(precip_raster, fact=spatial_scale, fun=mean)
     }
     
@@ -31,7 +30,7 @@ compile_fire_precip_data = function(spatial_scale='unit'){
       fire_raster_file = paste0('./data/fire_rasters/fire-',this_year,'-',this_month,'.tif')
       fire_raster = raster(fire_raster_file)
       
-      if(spatial_scale != 'unit'){
+      if(spatial_scale > 1){
         fire_raster = aggregate(fire_raster, fact=spatial_scale, fun=sum)
       }
       
@@ -48,12 +47,7 @@ compile_fire_precip_data = function(spatial_scale='unit'){
     }
   }
   
-  if(spatial_scale == 'unit'){
-    all_data$spatial_scale = 1
-  } else {
-    all_data$spatial_scale = spatial_scale
-  }
-  
+  all_data$spatial_scale = spatial_scale
   return(all_data)
 }
 
