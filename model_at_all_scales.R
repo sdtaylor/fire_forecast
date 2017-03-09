@@ -10,6 +10,8 @@ south_american_extent=extent(276, 328, -38, 15)
 training_years = 2001:2010
 testing_years = 2011:2015
 
+results_file='results_amazon_fire.csv'
+
 #########################################################################################
 #Convert all the raster data into a data.frame at a particular spatial scale.
 #unit scale is the original NCEP Reanalysis scale (2.5 deg). 
@@ -63,39 +65,64 @@ compile_fire_precip_data = function(spatial_scale='unit'){
 temporal_groupings = read.csv('temporal_groupings.csv')
 
 apply_temporal_scale = function(df, this_temporal_scale){
-  df %>%
+  df = df %>%
     left_join(filter(temporal_groupings, temporal_scale==this_temporal_scale), by='month') %>%
     group_by(temporal_cell_id, spatial_cell_id, year, spatial_scale, precip) %>%
     summarize(num_fires = sum(num_fires)) %>%
     ungroup()
+  df$temporal_scale = this_temporal_scale
+  return(df)
 }
 
+
+########################################################################################
+#Error metrics
+crps = function(df){
+  obs = df$num_fires
+  pred = as.matrix(df[,c('num_fires_predicted','num_fires_predicted_se')])
+  
+  verification::crps(obs, pred)$crps
+}
 
 
 ########################################################################################
 #Run a model given 
 
-results = data.frame()
+all_results = data.frame()
 
 for(this_temporal_scale in c(1,2,3,6)){
   for(this_spatial_scale in c(1,2,3,4)){
     fire_data = compile_fire_precip_data(spatial_scale = this_spatial_scale) %>%
       apply_temporal_scale(this_temporal_scale = this_temporal_scale)
     
+    #Ensure these get treated as catagorical in the models
+    fire_data$spatial_cell_id = as.factor(paste0('cell-',fire_data$spatial_cell_id))
+    fire_data$temporal_cell_id = as.factor(fire_data$temporal_cell_id)
+    
     training_data = fire_data %>%
       filter(year %in% training_years)
     testing_data = fire_data %>%
       filter(year %in% testing_years)
     
-    model = glm(num_fires ~ precip*spatial_cell_id + temporal_cell_id, data=training_data, family='poisson')
+    model = MASS::glm.nb(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, data=training_data)
+    #model = glm(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, family='poisson', data=training_data)
     
-    testing_data$num_fires_predicted = predict(model, newdata=testing_data, type = 'response')
     
+    pred = predict(model, newdata=testing_data, type = 'response', se.fit=TRUE)
+    testing_data$num_fires_predicted = pred$fit
+    testing_data$num_fires_predicted_se = pred$se.fit
     
+    testing_data$error = crps(testing_data)
+    
+    results = testing_data %>%
+      dplyr::select(temporal_cell_id, spatial_cell_id, year, spatial_scale, temporal_scale, error)
+    
+    all_results = all_results %>%
+      bind_rows(results)
   }
 }
 
-
+write.csv(all_results, results_file, row.names = FALSE)
 
 
 
