@@ -103,9 +103,9 @@ for(this_temporal_scale in c(1,2,3,6)){
     #The largest temporal grain is the sum of the entire fire season, so do not include
     #a month covariate
     if(this_temporal_scale == 6){
-      model = MASS::glm.nb(num_fires ~ precip*spatial_cell_id, data=training_data)
+      model = glm(num_fires ~ precip*spatial_cell_id, family='poisson', data=training_data)
     } else {
-      model = MASS::glm.nb(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, data=training_data)
+      model = glm(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, family='poisson', data=training_data)
     }
     
     pred = predict(model, newdata=testing_data, type = 'response', se.fit=TRUE)
