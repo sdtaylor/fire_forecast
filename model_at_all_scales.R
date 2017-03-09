@@ -86,6 +86,8 @@ all_results = data.frame()
 
 for(this_temporal_scale in c(1,2,3,6)){
   for(this_spatial_scale in c(1,2,3,4)){
+    print(paste0('Spatial: ',this_spatial_scale,', Temporal: ',this_temporal_scale))
+    
     fire_data = compile_fire_precip_data(spatial_scale = this_spatial_scale) %>%
       apply_temporal_scale(this_temporal_scale = this_temporal_scale)
     
@@ -98,9 +100,13 @@ for(this_temporal_scale in c(1,2,3,6)){
     testing_data = fire_data %>%
       filter(year %in% testing_years)
     
-    model = MASS::glm.nb(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, data=training_data)
-    #model = glm(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, family='poisson', data=training_data)
-    
+    #The largest temporal grain is the sum of the entire fire season, so do not include
+    #a month covariate
+    if(this_temporal_scale == 6){
+      model = MASS::glm.nb(num_fires ~ precip*spatial_cell_id, data=training_data)
+    } else {
+      model = MASS::glm.nb(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, data=training_data)
+    }
     
     pred = predict(model, newdata=testing_data, type = 'response', se.fit=TRUE)
     testing_data$num_fires_predicted = pred$fit
