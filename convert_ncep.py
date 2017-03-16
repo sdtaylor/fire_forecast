@@ -71,6 +71,10 @@ def dec_precip(filename):
     dec_precip = np.sum(xr_object.sel(time=december).prate.values, axis=0)
     return dec_precip
 
+def get_land_mask_data(filename):
+    xr_object = xr.open_dataset(filename, decode_times=False)
+    return xr_object.land.values[0]
+
 def ncep_filename(year):
     return data_dir+'prate.sfc.gauss.'+str(year)+'.nc'
 
@@ -89,3 +93,9 @@ if __name__ == '__main__':
 
         tif_filename = processed_data_dir+'precip-'+str(year)+'.tif'
         create_geotiff(tif_filename, total_precip, *raster_info)
+
+    #Convert the NCEP reanalysis land mask
+    raster_info = get_netCDF_info(raw_data_dir+'land.nc')
+    tif_filename = processed_data_dir+'land_mask.tif'
+    land_mask = get_land_mask_data(raw_data_dir+'land.nc')
+    create_geotiff(tif_filename, land_mask, *raster_info)
