@@ -5,11 +5,24 @@ library(raster)
 
 
 south_american_extent=extent(276, 328, -38, 15)
-
 training_years = 2001:2010
 testing_years = 2011:2015
 
 results_file='results_amazon_fire.csv'
+
+#################################################################################
+#Crop a raster to the South American continent using the NCEP land  mask
+#Also insert 0 values, which is relevent for the fire data
+land_mask = crop(raster('./data/precip_rasters/land_mask.tif'), south_american_extent)
+
+crop_to_land = function(r){
+  r = crop(r, south_american_extent)
+  if(!compareRaster(land_mask, r, stopiffalse = FALSE)){
+    land_mask = resample(land_mask, r, method='ngb')
+  }
+  r = calc(r, fun = function(x) ifelse(is.na(x),0,x))
+  mask(r, land_mask, maskvalue=0)
+}
 
 #########################################################################################
 #Convert all the raster data into a data.frame at a particular spatial scale.
@@ -19,16 +32,17 @@ compile_fire_precip_data = function(spatial_scale){
   all_data=data.frame()
   for(this_year in 2001:2015){
     precip_raster_file = paste0('./data/precip_rasters/precip-',this_year,'.tif')
-    precip_raster = raster(precip_raster_file)
-    precip_raster = crop(precip_raster, south_american_extent)
-    
+    precip_raster = raster(precip_raster_file) %>%
+      crop_to_land()
+
     if(spatial_scale > 1){
       precip_raster = aggregate(precip_raster, fact=spatial_scale, fun=mean)
     }
     
     for(this_month in 6:11){
       fire_raster_file = paste0('./data/fire_rasters/fire-',this_year,'-',this_month,'.tif')
-      fire_raster = raster(fire_raster_file)
+      fire_raster = raster(fire_raster_file) %>%
+        crop_to_land()
       
       if(spatial_scale > 1){
         fire_raster = aggregate(fire_raster, fact=spatial_scale, fun=sum)
@@ -47,7 +61,6 @@ compile_fire_precip_data = function(spatial_scale){
     }
   }
   
-  all_data$spatial_scale = spatial_scale
   return(all_data)
 }
 
@@ -61,10 +74,9 @@ temporal_groupings = read.csv('temporal_groupings.csv')
 apply_temporal_scale = function(df, this_temporal_scale){
   df = df %>%
     left_join(filter(temporal_groupings, temporal_scale==this_temporal_scale), by='month') %>%
-    group_by(temporal_cell_id, spatial_cell_id, year, spatial_scale, precip) %>%
+    group_by(temporal_cell_id, spatial_cell_id, year, precip) %>%
     summarize(num_fires = sum(num_fires)) %>%
     ungroup()
-  df$temporal_scale = this_temporal_scale
   return(df)
 }
 
@@ -91,6 +103,9 @@ for(this_temporal_scale in c(1,2,3,6)){
     fire_data = compile_fire_precip_data(spatial_scale = this_spatial_scale) %>%
       apply_temporal_scale(this_temporal_scale = this_temporal_scale)
     
+    fire_data$temporal_scale = this_temporal_scale
+    fire_data$spatial_scale = this_spatial_scale
+    
     #Ensure these get treated as catagorical in the models
     fire_data$spatial_cell_id = as.factor(paste0('cell-',fire_data$spatial_cell_id))
     fire_data$temporal_cell_id = as.factor(fire_data$temporal_cell_id)
@@ -101,7 +116,7 @@ for(this_temporal_scale in c(1,2,3,6)){
       filter(year %in% testing_years)
     
     #The largest temporal grain is the sum of the entire fire season, so do not include
-    #a month covariate
+    #a month covariate at that grain
     if(this_temporal_scale == 6){
       model = glm(num_fires ~ precip*spatial_cell_id, family='poisson', data=training_data)
     } else {
