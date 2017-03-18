@@ -19,6 +19,75 @@ crop_to_land = function(r){
   raster::mask(r, land_mask, maskvalue=0)
 }
 
+########################################################################################
+#Upscale the data temporally by aggregating months together within each year
+#Method 2 scales precip and fires together, while method 1 scales fire and fire predictions
+#together. 
+#Predefined aggregations for the months 6-10 at the different grain sizes
+temporal_groupings = read.csv('temporal_groupings.csv')
+
+apply_temporal_scale_method1 = function(df, this_temporal_scale){
+  df = df %>%
+    left_join(filter(temporal_groupings, temporal_scale==this_temporal_scale), by='month') %>%
+    group_by(temporal_cell_id, spatial_cell_id, year) %>%
+    summarize(num_fires = sum(num_fires), num_fires_predicted = sum(num_fires_predicted)) %>%
+    ungroup()
+  return(df)
+}
+
+apply_temporal_scale_method2 = function(df, this_temporal_scale){
+  df = df %>%
+    left_join(filter(temporal_groupings, temporal_scale==this_temporal_scale), by='month') %>%
+    group_by(temporal_cell_id, spatial_cell_id, year, precip) %>%
+    summarize(num_fires = sum(num_fires)) %>%
+    ungroup()
+  return(df)
+}
+
+
+########################################################################################
+#Error metrics
+crps = function(df){
+  obs = df$num_fires
+  pred = as.matrix(df[,c('num_fires_predicted','num_fires_predicted_se')])
+  
+  verification::crps(obs, pred)$crps
+}
+
+#########################################################################################
+#Combine the fire forecast and observed fires for all the testing years. 
+#Used for method 1 modeling. 
+compile_fire_forecast_and_observations = function(spatial_scale){
+  all_data=data.frame()
+  for(this_year in testing_years){
+    for(this_month in 6:11){
+      forecast_raster_file = paste0('./data/fire_predictions_rasters/fire-pred-',this_year,'-',this_month,'.tif')
+      forecast_raster = raster(forecast_raster_file) %>%
+        crop_to_land()
+      
+      observed_raster_file = paste0('./data/fire_rasters/fire-',this_year,'-',this_month,'.tif')
+      observed_raster = raster(observed_raster_file) %>%
+        crop_to_land()
+      
+      if(spatial_scale > 1){
+        forecast_raster = aggregate(forecast_raster, fact=spatial_scale, fun=sum)
+        observed_raster = aggregate(observed_raster, fact=spatial_scale, fun=sum)
+      }
+      
+      combined = as.data.frame(raster::stack(observed_raster, forecast_raster))
+      colnames(combined) = c('num_fires', 'num_fires_predicted')
+      combined$spatial_cell_id = 1:nrow(combined)
+      
+      combined = combined %>%
+        mutate(year=this_year, month = this_month) %>%
+        filter(!is.na(num_fires))
+  
+      all_data = all_data %>%
+        bind_rows(combined)
+    }
+  } 
+  return(all_data)
+}
 
 
 #########################################################################################

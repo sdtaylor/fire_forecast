@@ -7,7 +7,9 @@ source('./fire_model_tools.R')
 training_years = 2001:2010
 testing_years = 2011:2015
 
-do_unit_scale_model = TRUE
+do_unit_scale_model = FALSE
+
+results_file = 'results_amazone_fire_method1.csv'
 ###############################################################################
 #Model fires and create rasters from the testing years at the unit scale
 
@@ -58,6 +60,32 @@ if(do_unit_scale_model){
 
 #################################################################################
 #################################################################################
-#Aggregate the predictions of the unit scale model
+#Aggregate the predictions of the unit scale model to large grains and
+#calculate errors at each one
+
+all_results = data.frame()
+
+for(this_temporal_scale in c(1,2,3,6)){
+  for(this_spatial_scale in c(1,2,3,4)){
+   this_scale_data = compile_fire_forecast_and_observations(spatial_scale = this_spatial_scale) %>%
+     apply_temporal_scale_method1(this_temporal_scale)
+   
+   this_scale_data$temporal_scale = this_temporal_scale
+   this_scale_data$spatial_scale = this_spatial_scale
+    
+   this_scale_data = this_scale_data %>%
+     mutate(error = (num_fires - num_fires_predicted)^2)
+   
+   all_results = all_results %>%
+     bind_rows(this_scale_data)
+  }
+}
+
+write.csv(all_results, results_file, row.names = FALSE)
+
+
+
+
+
 
 
