@@ -34,10 +34,12 @@ if(do_unit_scale_model){
   #The real model
   #NA's are kept throughout, but excluded in modes fitting and prediction, because
   #they are needed in re-building the prediction rasters
-  model = glm(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, family='poisson', data=training_data[!is.na(training_data$num_fires),])
-  pred = predict(model, newdata=testing_data[!is.na(testing_data$num_fires),], type = 'response', se.fit=TRUE)
-  testing_data$num_fires_predicted=NA
-  testing_data$num_fires_predicted[!is.na(testing_data$num_fires)] = pred$fit
+  #model = glm(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, family='poisson', data=training_data[!is.na(training_data$num_fires),])
+  #pred = predict(model, newdata=testing_data[!is.na(testing_data$num_fires),], type = 'response', se.fit=TRUE)
+  model = randomForest(num_fires ~ precip + lat + lon + temporal_cell_id, data=training_data[!is.na(training_data$num_fires),])
+  pred = predict(model, newdata=testing_data[!is.na(testing_data$num_fires),])
+  
+  testing_data$num_fires_predicted[!is.na(testing_data$num_fires)] = pred
 
   #################################################################
   #Create  predictions rasters so the predictions can be spatially

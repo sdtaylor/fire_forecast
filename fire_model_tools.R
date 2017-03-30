@@ -131,5 +131,16 @@ compile_fire_precip_data = function(spatial_scale, drop_na=TRUE){
     }
   }
   
+  #Add in latitude and longitude
+  reference_raster = raster('./data/precip_rasters/precip-2001.tif') %>%
+    crop_to_land()
+  reference_raster = setValues(reference_raster, rep(1, ncell(reference_raster)))
+  lat_lons = as.data.frame(rasterToPoints(reference_raster))
+  colnames(lat_lons) = c('lon','lat','foo')
+  lat_lons$spatial_cell_id = 1:nrow(lat_lons)
+  lat_lons = dplyr::select(lat_lons, -foo)
+  all_data = all_data %>%
+    left_join(lat_lons, by='spatial_cell_id')
+  
   return(all_data)
 }
