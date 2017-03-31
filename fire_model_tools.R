@@ -26,12 +26,21 @@ crop_to_land = function(r){
 #Predefined aggregations for the months 6-10 at the different grain sizes
 temporal_groupings = read.csv('temporal_groupings.csv')
 
-apply_temporal_scale_method1 = function(df, this_temporal_scale){
+apply_temporal_scale_method1 = function(df, this_temporal_scale, scaling_method) {
   df = df %>%
-    left_join(filter(temporal_groupings, temporal_scale==this_temporal_scale), by='month') %>%
-    group_by(temporal_cell_id, spatial_cell_id, year) %>%
-    summarize(num_fires = sum(num_fires), num_fires_predicted = sum(num_fires_predicted)) %>%
-    ungroup()
+    left_join(filter(temporal_groupings, temporal_scale==this_temporal_scale), by='month')
+  
+  if(scaling_method == 'sum'){
+    df = df %>%
+      group_by(temporal_cell_id, spatial_cell_id, year) %>%
+      summarize(num_fires = sum(num_fires), num_fires_predicted = sum(num_fires_predicted)) %>%
+      ungroup()
+  } else if(scaling_method == 'mean'){
+    df = df %>%
+      group_by(temporal_cell_id, spatial_cell_id, year) %>%
+      summarize(num_fires = mean(num_fires), num_fires_predicted = mean(num_fires_predicted)) %>%
+      ungroup()
+  }
   return(df)
 }
 
@@ -67,7 +76,10 @@ obs_pred_square=function(actual, predicted){
 #########################################################################################
 #Combine the fire forecast and observed fires for all the testing years. 
 #Used for method 1 modeling. 
-compile_fire_forecast_and_observations = function(spatial_scale){
+compile_fire_forecast_and_observations = function(spatial_scale, scaling_method){
+  if(scaling_method == 'sum'){scale_func = sum}
+  if(scaling_method == 'mean'){scale_func = mean}
+  
   all_data=data.frame()
   for(this_year in testing_years){
     for(this_month in 6:11){
@@ -80,8 +92,8 @@ compile_fire_forecast_and_observations = function(spatial_scale){
         crop_to_land()
       
       if(spatial_scale > 1){
-        forecast_raster = aggregate(forecast_raster, fact=spatial_scale, fun=sum)
-        observed_raster = aggregate(observed_raster, fact=spatial_scale, fun=sum)
+        forecast_raster = aggregate(forecast_raster, fact=spatial_scale, fun=scale_func)
+        observed_raster = aggregate(observed_raster, fact=spatial_scale, fun=scale_func)
       }
       
       combined = as.data.frame(raster::stack(observed_raster, forecast_raster))
