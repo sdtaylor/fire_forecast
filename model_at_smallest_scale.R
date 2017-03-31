@@ -2,12 +2,13 @@ library(tidyverse)
 library(magrittr)
 library(lubridate)
 library(raster)
+library(randomForest)
 source('./fire_model_tools.R')
 
 training_years = 2001:2010
 testing_years = 2011:2015
 
-do_unit_scale_model = FALSE
+do_unit_scale_model = TRUE
 
 results_file = 'results_amazone_fire_method1.csv'
 ###############################################################################
@@ -36,10 +37,10 @@ if(do_unit_scale_model){
   #they are needed in re-building the prediction rasters
   #model = glm(num_fires ~ precip*spatial_cell_id + precip:spatial_cell_id:temporal_cell_id, family='poisson', data=training_data[!is.na(training_data$num_fires),])
   #pred = predict(model, newdata=testing_data[!is.na(testing_data$num_fires),], type = 'response', se.fit=TRUE)
-  model = randomForest(num_fires ~ precip + lat + lon + temporal_cell_id, data=training_data[!is.na(training_data$num_fires),])
+  model = randomForest(log1p(num_fires) ~ precip + lat + lon + temporal_cell_id, data=training_data[!is.na(training_data$num_fires),])
   pred = predict(model, newdata=testing_data[!is.na(testing_data$num_fires),])
   
-  testing_data$num_fires_predicted[!is.na(testing_data$num_fires)] = pred
+  testing_data$num_fires_predicted[!is.na(testing_data$num_fires)] = expm1(pred)
 
   #################################################################
   #Create  predictions rasters so the predictions can be spatially
