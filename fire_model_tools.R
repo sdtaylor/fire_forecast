@@ -38,7 +38,7 @@ apply_temporal_scale_method1 = function(df, this_temporal_scale){
 apply_temporal_scale_method2 = function(df, this_temporal_scale){
   df = df %>%
     left_join(filter(temporal_groupings, temporal_scale==this_temporal_scale), by='month') %>%
-    group_by(temporal_cell_id, spatial_cell_id, year, precip) %>%
+    group_by(temporal_cell_id, spatial_cell_id, year, precip, lat, lon) %>%
     summarize(num_fires = sum(num_fires)) %>%
     ungroup()
   return(df)
@@ -47,11 +47,21 @@ apply_temporal_scale_method2 = function(df, this_temporal_scale){
 
 ########################################################################################
 #Error metrics
+
+#Continuous ranked probability score
 crps = function(df){
   obs = df$num_fires
   pred = as.matrix(df[,c('num_fires_predicted','num_fires_predicted_se')])
   
   verification::crps(obs, pred)$crps
+}
+
+#R^2 from a 1:1 line
+#log transform because Marks & Muller-Landau 2007: 10.1126/science.1140190 
+obs_pred_square=function(actual, predicted){
+  actual=actual
+  predicted=predicted
+  1 - (sum((actual - predicted) ** 2) / sum((actual - mean(actual)) ** 2))
 }
 
 #########################################################################################
