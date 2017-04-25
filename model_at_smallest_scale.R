@@ -10,11 +10,7 @@ testing_years = 2011:2015
 
 do_unit_scale_model = FALSE
 
-#This file has details of predicted and actual fires at all scales
-all_results_file = 'all_results_method1.csv'
-
-#This file just has the final metrics for plots
-final_results_file = 'final_amazon_fire_method1.csv'
+results_file = 'results_amazon_fire_method1.csv'
 ###############################################################################
 #Model fires and create rasters from the testing years at the unit scale
 
@@ -82,23 +78,13 @@ for(this_temporal_scale in c(1,2,3,6)){
      this_scale_data$spatial_scale = this_spatial_scale
      this_scale_data$scaling_method = this_scaling_method
 
-     print(paste(this_spatial_scale, this_temporal_scale, this_scaling_method, sum(is.na(this_scale_data$num_fires))))
      all_results = all_results %>%
        bind_rows(this_scale_data)
     }
   }
 }
 
-#The  final error metrics used for graphing
-scaled_scores = all_results %>%
-  filter(!is.na(num_fires)) %>%
-  mutate(error = (num_fires - num_fires_predicted)^2) %>%
-  group_by(scaling_method, temporal_scale, spatial_scale) %>%
-  summarize(score = sqrt(mean(error, na.rm=T))) %>%
-  ungroup()
-
-write.csv(all_results, all_results_file, row.names = FALSE)
-write.csv(scaled_scores, final_results_file, row.names = FALSE)
+write.csv(all_results, results_file, row.names = FALSE)
 
 
 
